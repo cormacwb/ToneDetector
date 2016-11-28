@@ -14,37 +14,45 @@ namespace Mp3ReaderTests
         private const int TargetFrequency1 = 947;
         private const int TargetFrequency2 = 1270;
 
-        [TestCase("Mp3ReaderTests.TestMp3Files.WithTonePattern.mp3")]
-        [TestCase("Mp3ReaderTests.TestMp3Files.WithTonePattern2.mp3")]
-        public void Detected_DataContainsTonePattern_EventuallyReturnsTrue(string uri)
+        [TestCase("Mp3ReaderTests.TestMp3Files.WithTonePattern.mp3", 2)]
+        [TestCase("Mp3ReaderTests.TestMp3Files.WithTonePattern2.mp3", 30)]
+        public void Detected_DataContainsTonePattern_EventuallyReturnsTrue(string uri, int expectedTimestampInSeconds)
         {
             var stream = GetEmbeddedResourceStream(uri);
             
             using (var reader = new Mp3FileReader(stream))
             {
-                TonePatternDetected(reader).Should().BeTrue();
+                SecondsUntilPatternConcluded(reader).Should().Be(expectedTimestampInSeconds);
             }
         }
 
-        private static bool TonePatternDetected(IWaveProvider reader)
+        private static int SecondsUntilPatternConcluded(IWaveProvider reader)
         {
             var sampleProvider = reader.ToSampleProvider();
             var toneDetector = new TonePatternDetector(TargetFrequency1, TargetFrequency2,
                 sampleProvider.WaveFormat.SampleRate);
             var buffer = new float[BufferSize];
+            long sampleCount = 0;
 
             while (true)
             {
                 var bytesRead = sampleProvider.Read(buffer, 0, buffer.Length);
+                sampleCount += bytesRead;
+
                 if (bytesRead < buffer.Length) break;
 
                 if (toneDetector.Detected(buffer))
                 {
-                    return true;
+                    return GetElapsedSeconds(sampleProvider.WaveFormat.SampleRate, sampleCount);
                 }
             }
 
-            return false;
+            return -1;
+        }
+
+        private static int GetElapsedSeconds(int sampleRate, long sampleCount)
+        {
+            return (int)(sampleCount / sampleRate);
         }
 
         private static Stream GetEmbeddedResourceStream(string resourceName)
@@ -60,9 +68,8 @@ namespace Mp3ReaderTests
 
             using (var reader = new Mp3FileReader(stream))
             {
-                TonePatternDetected(reader).Should().BeFalse();
+                SecondsUntilPatternConcluded(reader).Should().Be(-1);
             }
         }
-
     }
 }

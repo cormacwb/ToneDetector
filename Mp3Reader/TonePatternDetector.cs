@@ -33,6 +33,7 @@ namespace Mp3Reader
 
         public bool Detected(float[] samples)
         {
+            if (_state == PatternState.ToneDetected) return true;
             Validate(samples);
 
             var fft = CreateFftBuffer(samples);
@@ -129,11 +130,15 @@ namespace Mp3Reader
             {
                 _state = StateTransitionMap[_state];
             }
+            else
+            {
+                _state = PatternState.NoTargetFrequencyDetected;
+            }
         }
 
         private bool NoChangeInDominantFrequency(int previousDominantFrequency, int currentDominantFrequency)
         {
-            return previousDominantFrequency == currentDominantFrequency && _state != ToneDetectorState.NoTargetFrequencyDetected;
+            return previousDominantFrequency == currentDominantFrequency && _dominantFrequencies.Any();
         }
 
         private int GetPreviousDominantFrequency()
