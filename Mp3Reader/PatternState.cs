@@ -1,6 +1,6 @@
 ﻿namespace Mp3Reader
 {
-    public enum ToneDetectorState
+    public enum PatternState
     {
         NoTargetFrequencyDetected,
         Repetion1Frequency1,

@@ -12,7 +12,7 @@ namespace Mp3Reader
         private readonly int _targetFrequency2;
         private readonly int _sampleRate;
 
-        private ToneDetectorState _state;
+        private PatternState _state;
         private readonly List<int> _dominantFrequencies; 
 
         public TonePatternDetector(int targetFrequency1, int targetFrequency2, int sampleRate)
@@ -20,7 +20,7 @@ namespace Mp3Reader
             _targetFrequency1 = targetFrequency1;
             _targetFrequency2 = targetFrequency2;
             _sampleRate = sampleRate;
-            _state = ToneDetectorState.NoTargetFrequencyDetected;
+            _state = PatternState.NoTargetFrequencyDetected;
 
             _dominantFrequencies = new List<int>();
         }
@@ -28,7 +28,7 @@ namespace Mp3Reader
         public void Reset()
         {
             _dominantFrequencies.Clear();
-            _state = ToneDetectorState.NoTargetFrequencyDetected;
+            _state = PatternState.NoTargetFrequencyDetected;
         }
 
         public bool Detected(float[] samples)
@@ -41,7 +41,7 @@ namespace Mp3Reader
             UpdateDominantFrequencyList(fft);
             UpdateState();
 
-            return _state == ToneDetectorState.ToneDetected;
+            return _state == PatternState.ToneDetected;
         }
 
         private static void Validate(float[] samples)
@@ -143,30 +143,29 @@ namespace Mp3Reader
                 : _dominantFrequencies.Single();
         }
 
-        private static readonly Dictionary<ToneDetectorState, ToneDetectorState> StateTransitionMap = new Dictionary<ToneDetectorState, ToneDetectorState>
+        private static readonly Dictionary<PatternState, PatternState> StateTransitionMap = new Dictionary<PatternState, PatternState>
         {
-            {ToneDetectorState.NoTargetFrequencyDetected, ToneDetectorState.Repetion1Frequency1},
-            {ToneDetectorState.Repetion1Frequency1, ToneDetectorState.Repetion1Frequency2},
-            {ToneDetectorState.Repetion1Frequency2, ToneDetectorState.Repetion2Frequency1},
-            {ToneDetectorState.Repetion2Frequency1, ToneDetectorState.Repetion2Frequency2},
-            {ToneDetectorState.Repetion2Frequency2, ToneDetectorState.Repetion3Frequency1},
-            {ToneDetectorState.Repetion3Frequency1, ToneDetectorState.ToneDetected}
+            {PatternState.NoTargetFrequencyDetected, PatternState.Repetion1Frequency1},
+            {PatternState.Repetion1Frequency1, PatternState.Repetion1Frequency2},
+            {PatternState.Repetion1Frequency2, PatternState.Repetion2Frequency1},
+            {PatternState.Repetion2Frequency1, PatternState.Repetion2Frequency2},
+            {PatternState.Repetion2Frequency2, PatternState.Repetion3Frequency1},
+            {PatternState.Repetion3Frequency1, PatternState.ToneDetected}
         };
 
         private int GetCurrentTargetFrequency()
         {
             switch (_state)
             {
-                case ToneDetectorState.Repetion1Frequency1:
-                case ToneDetectorState.Repetion2Frequency1: 
-                case ToneDetectorState.Repetion3Frequency1:
+                case PatternState.Repetion1Frequency1:
+                case PatternState.Repetion2Frequency1: 
+                case PatternState.Repetion3Frequency1:
                     return _targetFrequency2;
-                case ToneDetectorState.NoTargetFrequencyDetected:
-                case ToneDetectorState.Repetion1Frequency2:
-                case ToneDetectorState.Repetion2Frequency2:
+                case PatternState.NoTargetFrequencyDetected:
+                case PatternState.Repetion1Frequency2:
+                case PatternState.Repetion2Frequency2:
                     return _targetFrequency1;
-                case ToneDetectorState.ToneDetected:
-                    throw new InvalidOperationException("Tone has already been detected");
+                case PatternState.ToneDetected:
                 default:
                     throw new Exception("Component has entered an unexpected state");
             }
