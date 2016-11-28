@@ -55,6 +55,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="DispatchMessageRecorderTests.cs" />
+    <Compile Include="Helpers\EmbeddedResourceReader.cs" />
+    <Compile Include="Helpers\TimeStampHelper.cs" />
     <Compile Include="TonePatternDetectorTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
@@ -72,6 +75,9 @@
     <EmbeddedResource Include="TestMp3Files\StaticOnly.mp3" />
     <EmbeddedResource Include="TestMp3Files\WithTonePattern.mp3" />
     <EmbeddedResource Include="TestMp3Files\WithTonePattern2.mp3" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="TestMp3Files\MultipleDispatchMessages.mp3" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

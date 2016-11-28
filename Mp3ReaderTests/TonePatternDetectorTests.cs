@@ -1,7 +1,6 @@
-﻿using System.IO;
-using System.Reflection;
-using FluentAssertions;
+﻿using FluentAssertions;
 using Mp3Reader;
+using Mp3ReaderTests.Helpers;
 using NAudio.Wave;
 using NUnit.Framework;
 
@@ -18,8 +17,8 @@ namespace Mp3ReaderTests
         [TestCase("Mp3ReaderTests.TestMp3Files.WithTonePattern2.mp3", 30)]
         public void Detected_DataContainsTonePattern_EventuallyReturnsTrue(string uri, int expectedTimestampInSeconds)
         {
-            var stream = GetEmbeddedResourceStream(uri);
-            
+            var stream = EmbeddedResourceReader.GetStream(uri);
+
             using (var reader = new Mp3FileReader(stream))
             {
                 SecondsUntilPatternConcluded(reader).Should().Be(expectedTimestampInSeconds);
@@ -43,28 +42,18 @@ namespace Mp3ReaderTests
 
                 if (toneDetector.Detected(buffer))
                 {
-                    return GetElapsedSeconds(sampleProvider.WaveFormat.SampleRate, sampleCount);
+                    return TimeStampHelper.GetElapsedSeconds(sampleProvider.WaveFormat.SampleRate, sampleCount);
                 }
             }
 
             return -1;
         }
 
-        private static int GetElapsedSeconds(int sampleRate, long sampleCount)
-        {
-            return (int)(sampleCount / sampleRate);
-        }
-
-        private static Stream GetEmbeddedResourceStream(string resourceName)
-        {
-            return Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName);
-        }
-
         [TestCase("Mp3ReaderTests.TestMp3Files.StaticOnly.mp3")]
         [TestCase("Mp3ReaderTests.TestMp3Files.SpeechWithoutTonePattern.mp3")]
         public void Detected_DataDoesNotContainTargetPattern_AlwaysReturnsFalse(string uri)
         {
-            var stream = GetEmbeddedResourceStream(uri);
+            var stream = EmbeddedResourceReader.GetStream(uri);
 
             using (var reader = new Mp3FileReader(stream))
             {
