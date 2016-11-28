@@ -8,47 +8,84 @@ namespace Mp3Reader
     public class Program
     {
         private const int BufferSize = 1024;
-        private const string DefaultPath = @"C:\Users\Cormac\Music\StationRipper\output\ECOMM Vancouver Scanner\tone.mp3";
+        private const string DefaultPath = @"C:\Users\Cormac\Music\RadioSure Recordings\Vancouver dispatch\MultipleDispatches.mp3";
         private const int TargetFrequency1 = 947;
         private const int TargetFrequency2 = 1270;
-        private const double SilenceThreshold = 0.01;
 
         static void Main(string[] args)
         {
             var path = args.Any() ? args[0] : DefaultPath;
+
+            long sampleCount = 0;
+            
             using (var reader = new Mp3FileReader(path))
             {
+                
                 var sampleProvider = reader.ToSampleProvider();
-                var toneDetector = new TonePatternDetector(TargetFrequency1, TargetFrequency2,
-                    sampleProvider.WaveFormat.SampleRate);
                 var buffer = new float[BufferSize];
 
+                var toneDetector = new TonePatternDetector(TargetFrequency1, TargetFrequency2, sampleProvider.WaveFormat.SampleRate);
+                
+                var recorders = new List<DispatchMessageRecorder>();
+                
                 while (true)
                 {
                     var bytesRead = sampleProvider.Read(buffer, 0, buffer.Length);
-                    
-                    if (EndOfSamples(bytesRead, buffer)) break;
-                    if (ContainsOnlySilence(buffer)) continue;
+                    sampleCount += bytesRead;
 
+                    if (EndOfSamples(bytesRead, buffer)) break;
+                    
                     if (toneDetector.Detected(buffer))
                     {
-                        Console.WriteLine("File contains tone pattern");
-                        Environment.Exit(0);
+                        recorders.Add(new DispatchMessageRecorder(reader.WaveFormat));
+                        toneDetector.Reset();
                     }
+
+                    foreach (var recorder in recorders)
+                    {
+                        recorder.Record(buffer, bytesRead);
+                    }
+
+                    recorders = RefreshRecorderList(recorders).ToList();
                 }
 
-                Console.WriteLine("File does not contain tone pattern");
+                RefreshRecorderList(recorders);
+
+
+                Console.WriteLine("Complete");
             }
         }
 
-        private static bool EndOfSamples(int bytesRead, float[] buffer)
+        private static IEnumerable<DispatchMessageRecorder> RefreshRecorderList(IEnumerable<DispatchMessageRecorder> recorders)
         {
-            return bytesRead < buffer.Length;
+            foreach (var recorder in recorders)
+            {
+                if (recorder.IsFinishedRecording)
+                {
+                    recorder.Dispose();
+                }
+                else
+                {
+                    yield return recorder;
+                }
+            }
         }
 
-        private static bool ContainsOnlySilence(IEnumerable<float> buffer)
+        private static string GetTimestamp(long sampleCount)
         {
-            return buffer.All(n => Math.Abs(n) < SilenceThreshold);
+            const int samplesPerSecond = 22050;
+
+            var seconds = sampleCount/samplesPerSecond;
+
+            var minutes = seconds/60;
+            var secondsOnly = seconds%60;
+
+            return $"{minutes}:{secondsOnly}";
+        }
+
+        private static bool EndOfSamples(int bytesRead, IReadOnlyCollection<float> buffer)
+        {
+            return bytesRead < buffer.Count;
         }
     }
 }
