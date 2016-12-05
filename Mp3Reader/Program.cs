@@ -1,59 +1,97 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using NAudio.Wave;
 
 namespace Mp3Reader
 {
     public class Program
     {
-        private const int BufferSize = 1024;
-        private const string DefaultPath = @"C:\Users\Cormac\Music\RadioSure Recordings\Vancouver dispatch\MultipleDispatches.mp3";
+        private const int SampleBufferSize = 1024;
         private const int TargetFrequency1 = 947;
         private const int TargetFrequency2 = 1270;
+        const string DefaultUrl = "http://provoice.scanbc.com:8000/ecommvancouver";
 
         static void Main(string[] args)
         {
-            var path = args.Any() ? args[0] : DefaultPath;
+            var url = args.Any() ? args[0] : DefaultUrl;
+            var request = (HttpWebRequest)WebRequest.Create(url);
 
-            long sampleCount = 0;
-            
-            using (var reader = new Mp3FileReader(path))
+            HttpWebResponse response = null;
+            try
             {
+                response = (HttpWebResponse)request.GetResponse();
+            }
+            catch (WebException e)
+            {
+                Console.WriteLine($"Could not read stream: {e.Message}");
+                Environment.Exit(1);
                 
-                var sampleProvider = reader.ToSampleProvider();
-                var buffer = new float[BufferSize];
+            }
 
-                var toneDetector = new TonePatternDetector(TargetFrequency1, TargetFrequency2, sampleProvider.WaveFormat.SampleRate);
-                
+            using (var responseStream = response.GetResponseStream())
+            {
+                IMp3FrameDecompressor decompressor = null;
+                BufferedWaveProvider bufferedWaveProvider = null;
+                TonePatternDetector toneDetector = null;
+                var sampleBuffer = new float[SampleBufferSize];
                 var recorders = new List<DispatchMessageRecorder>();
-                
+                var byteBuffer = new byte[16384 * 4];
+                var readFullyStream = new ReadFullyStream(responseStream);
+
                 while (true)
                 {
-                    var bytesRead = sampleProvider.Read(buffer, 0, buffer.Length);
-                    sampleCount += bytesRead;
-
-                    if (EndOfSamples(bytesRead, buffer)) break;
-                    
-                    if (toneDetector.Detected(buffer))
+                    var frame = Mp3Frame.LoadFromStream(readFullyStream);
+                    if (decompressor == null)
                     {
-                        recorders.Add(new DispatchMessageRecorder(reader.WaveFormat));
+                        decompressor = CreateFrameDecompressor(frame);
+                        bufferedWaveProvider = CreateBufferedWaveProvider(decompressor);
+                        toneDetector = new TonePatternDetector(TargetFrequency1, TargetFrequency2,
+                            bufferedWaveProvider.WaveFormat.SampleRate);
+                    }
+
+                    var decompressed = decompressor.DecompressFrame(frame, byteBuffer, 0);
+                    bufferedWaveProvider.AddSamples(byteBuffer, 0, decompressed);
+                    var bytesRead = bufferedWaveProvider.ToSampleProvider().Read(sampleBuffer, 0, sampleBuffer.Length);
+
+                    if (EndOfSamples(bytesRead, sampleBuffer)) break;
+                    
+                    if (toneDetector.Detected(sampleBuffer))
+                    {
+                        Console.WriteLine($"Tone detected at {DateTime.Now}");
+                        recorders.Add(new DispatchMessageRecorder(bufferedWaveProvider.WaveFormat));
                         toneDetector.Reset();
                     }
 
                     foreach (var recorder in recorders)
                     {
-                        recorder.Record(buffer, bytesRead);
+                        recorder.Record(sampleBuffer, bytesRead);
                     }
 
                     recorders = RefreshRecorderList(recorders).ToList();
                 }
 
-                RefreshRecorderList(recorders);
+                recorders.ForEach(r => r.Dispose());
 
 
                 Console.WriteLine("Complete");
             }
+        }
+
+        private static BufferedWaveProvider CreateBufferedWaveProvider(IMp3FrameDecompressor decompressor)
+        {
+            return new BufferedWaveProvider(decompressor.OutputFormat)
+            {
+                BufferDuration = TimeSpan.FromSeconds(1)
+            };
+        }
+
+        private static IMp3FrameDecompressor CreateFrameDecompressor(Mp3Frame frame)
+        {
+            var waveFormat = new Mp3WaveFormat(frame.SampleRate, frame.ChannelMode == ChannelMode.Mono ? 1 : 2,
+                frame.FrameLength, frame.BitRate);
+            return new AcmMp3FrameDecompressor(waveFormat);
         }
 
         private static IEnumerable<DispatchMessageRecorder> RefreshRecorderList(IEnumerable<DispatchMessageRecorder> recorders)
@@ -62,6 +100,7 @@ namespace Mp3Reader
             {
                 if (recorder.IsFinishedRecording)
                 {
+                    Console.WriteLine($"Recording complete at {DateTime.Now}");
                     recorder.Dispose();
                 }
                 else
@@ -69,18 +108,6 @@ namespace Mp3Reader
                     yield return recorder;
                 }
             }
-        }
-
-        private static string GetTimestamp(long sampleCount)
-        {
-            const int samplesPerSecond = 22050;
-
-            var seconds = sampleCount/samplesPerSecond;
-
-            var minutes = seconds/60;
-            var secondsOnly = seconds%60;
-
-            return $"{minutes}:{secondsOnly}";
         }
 
         private static bool EndOfSamples(int bytesRead, IReadOnlyCollection<float> buffer)
