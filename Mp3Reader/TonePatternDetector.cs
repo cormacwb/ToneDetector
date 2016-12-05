@@ -13,7 +13,7 @@ namespace Mp3Reader
         private readonly int _sampleRate;
 
         private PatternState _state;
-        private readonly List<int> _dominantFrequencies; 
+        private int _previousDominantFrequency;
 
         public TonePatternDetector(int targetFrequency1, int targetFrequency2, int sampleRate)
         {
@@ -21,13 +21,10 @@ namespace Mp3Reader
             _targetFrequency2 = targetFrequency2;
             _sampleRate = sampleRate;
             _state = PatternState.NoTargetFrequencyDetected;
-
-            _dominantFrequencies = new List<int>();
         }
 
         public void Reset()
         {
-            _dominantFrequencies.Clear();
             _state = PatternState.NoTargetFrequencyDetected;
         }
 
@@ -38,9 +35,7 @@ namespace Mp3Reader
 
             var fft = CreateFftBuffer(samples);
             FastFourierTransform.FFT(true, GetLog(samples.Length), fft);
-
-            UpdateDominantFrequencyList(fft);
-            UpdateState();
+            UpdateState(fft);
 
             return _state == PatternState.ToneDetected;
         }
@@ -49,12 +44,6 @@ namespace Mp3Reader
         {
             if (samples == null) throw new ArgumentNullException(nameof(samples));
             if (!samples.Any()) throw new ArgumentException("samples cannot be empty");
-        }
-
-        private void UpdateDominantFrequencyList(Complex[] fft)
-        {
-            var currentDominantFrequency = GetDominantFrequency(fft);
-            _dominantFrequencies.Add(currentDominantFrequency);
         }
 
         private static Complex[] CreateFftBuffer(float[] samples)
@@ -68,7 +57,7 @@ namespace Mp3Reader
             return fft;
         }
 
-        private static Complex CreateComplexInput(float[] buffer, int index)
+        private static Complex CreateComplexInput(IReadOnlyList<float> buffer, int index)
         {
             var real = CreateRealComponent(buffer, index);
             const int imaginary = 0;
@@ -83,8 +72,37 @@ namespace Mp3Reader
 
         private static int GetLog(int bufferSize)
         {
-            return (int) Math.Log(bufferSize, 2);
+            return (int)Math.Log(bufferSize, 2);
         }
+
+        private void UpdateState(Complex[] fft)
+        {
+            var currentDominantFrequency = GetDominantFrequency(fft);
+
+            if (_previousDominantFrequency == currentDominantFrequency) return;
+
+            var currentTargetFrequency = GetCurrentTargetFrequency();
+            if (currentDominantFrequency == currentTargetFrequency)
+            {
+                _state = StateTransitionMap[_state];
+            }
+            else
+            {
+                _state = PatternState.NoTargetFrequencyDetected;
+            }
+
+            _previousDominantFrequency = currentDominantFrequency;
+        }
+
+        private static readonly Dictionary<PatternState, PatternState> StateTransitionMap = new Dictionary<PatternState, PatternState>
+        {
+            {PatternState.NoTargetFrequencyDetected, PatternState.Repetion1Frequency1},
+            {PatternState.Repetion1Frequency1, PatternState.Repetion1Frequency2},
+            {PatternState.Repetion1Frequency2, PatternState.Repetion2Frequency1},
+            {PatternState.Repetion2Frequency1, PatternState.Repetion2Frequency2},
+            {PatternState.Repetion2Frequency2, PatternState.Repetion3Frequency1},
+            {PatternState.Repetion3Frequency1, PatternState.ToneDetected}
+        };
 
         private int GetDominantFrequency(Complex[] fft)
         {
@@ -95,7 +113,7 @@ namespace Mp3Reader
         private static int GetIndexOfMaxMagnitude(Complex[] fft)
         {
             double maxMagnitude = 0;
-            int indexOfMaxMagnitude = 0;
+            var indexOfMaxMagnitude = 0;
             for (var i = 0; i < fft.Length; i++)
             {
                 var magnitude = CalculateMagnitude(fft[i]);
@@ -108,55 +126,16 @@ namespace Mp3Reader
             return indexOfMaxMagnitude;
         }
 
-        private static int GetFrequency(int indexOfMaxMagnitude, int sampleRate, int bufferSize)
-        {
-            return indexOfMaxMagnitude * sampleRate / bufferSize;
-        }
-
         private static double CalculateMagnitude(Complex complex)
         {
             return Math.Sqrt((complex.X * complex.X) + (complex.Y * complex.Y));
         }
 
-        private void UpdateState()
+
+        private static int GetFrequency(int indexOfMaxMagnitude, int sampleRate, int bufferSize)
         {
-            var currentDominantFrequency = _dominantFrequencies.Last();
-            var previousDominantFrequency = GetPreviousDominantFrequency();
-
-            if (NoChangeInDominantFrequency(previousDominantFrequency, currentDominantFrequency)) return;
-
-            var currentTargetFrequency = GetCurrentTargetFrequency();
-            if (currentDominantFrequency == currentTargetFrequency)
-            {
-                _state = StateTransitionMap[_state];
-            }
-            else
-            {
-                _state = PatternState.NoTargetFrequencyDetected;
-            }
+            return indexOfMaxMagnitude * sampleRate / bufferSize;
         }
-
-        private bool NoChangeInDominantFrequency(int previousDominantFrequency, int currentDominantFrequency)
-        {
-            return previousDominantFrequency == currentDominantFrequency && _dominantFrequencies.Any();
-        }
-
-        private int GetPreviousDominantFrequency()
-        {
-            return _dominantFrequencies.Count > 1
-                ? _dominantFrequencies[_dominantFrequencies.Count - 2]
-                : _dominantFrequencies.Single();
-        }
-
-        private static readonly Dictionary<PatternState, PatternState> StateTransitionMap = new Dictionary<PatternState, PatternState>
-        {
-            {PatternState.NoTargetFrequencyDetected, PatternState.Repetion1Frequency1},
-            {PatternState.Repetion1Frequency1, PatternState.Repetion1Frequency2},
-            {PatternState.Repetion1Frequency2, PatternState.Repetion2Frequency1},
-            {PatternState.Repetion2Frequency1, PatternState.Repetion2Frequency2},
-            {PatternState.Repetion2Frequency2, PatternState.Repetion3Frequency1},
-            {PatternState.Repetion3Frequency1, PatternState.ToneDetected}
-        };
 
         private int GetCurrentTargetFrequency()
         {
@@ -170,7 +149,6 @@ namespace Mp3Reader
                 case PatternState.Repetion1Frequency2:
                 case PatternState.Repetion2Frequency2:
                     return _targetFrequency1;
-                case PatternState.ToneDetected:
                 default:
                     throw new Exception("Component has entered an unexpected state");
             }
