@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using log4net;
 using NAudio.Wave;
 
 namespace Mp3Reader
@@ -16,6 +17,8 @@ namespace Mp3Reader
         public bool IsFinishedRecording { get; private set; }
         public string FileName => _writer.Filename;
 
+        private static readonly ILog Log =
+            LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
         public DispatchMessageRecorder(WaveFormat format)
         {

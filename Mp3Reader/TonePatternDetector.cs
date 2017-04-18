@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using log4net;
 using Mp3Reader.Interface;
 using NAudio.Dsp;
 
@@ -14,6 +15,8 @@ namespace Mp3Reader
 
         private PatternState _state;
         private int _previousDominantFrequency;
+        private static readonly ILog Log =
+            LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
         public TonePatternDetector(int targetFrequency1, int targetFrequency2, int sampleRate)
         {
@@ -84,6 +87,7 @@ namespace Mp3Reader
             var currentTargetFrequency = GetCurrentTargetFrequency();
             if (currentDominantFrequency == currentTargetFrequency)
             {
+                Log.Debug($"Detected target frequency {currentDominantFrequency}");
                 _state = StateTransitionMap[_state];
             }
             else

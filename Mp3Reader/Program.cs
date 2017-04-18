@@ -4,6 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using NAudio.Wave;
+using log4net;
+using log4net.Config;
+
 
 namespace Mp3Reader
 {
@@ -14,8 +17,13 @@ namespace Mp3Reader
         private const int TargetFrequency2 = 1270;
         private const string DefaultUrl = "http://provoice.scanbc.com:8000/ecommvancouver";
 
+        private static readonly ILog Log =
+            LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+
         public static void Main(string[] args)
         {
+            XmlConfigurator.Configure();
+            Log.Info("Starting...");
             var url = args.Any() ? args[0] : DefaultUrl;
             var request = (HttpWebRequest)WebRequest.Create(url);
 
@@ -23,12 +31,12 @@ namespace Mp3Reader
             try
             {
                 response = (HttpWebResponse)request.GetResponse();
+                Log.Info("Connected");
             }
             catch (WebException e)
             {
-                Console.WriteLine($"Could not read stream: {e.Message}");
+                Log.Error($"Could not read stream: {e.Message}");
                 Environment.Exit(1);
-                
             }
 
             using (var responseStream = response.GetResponseStream())
@@ -53,7 +61,7 @@ namespace Mp3Reader
                     
                     if (toneDetector.Detected(sampleBuffer))
                     {
-                        Console.WriteLine($"Tone detected at {DateTime.Now}");
+                        Log.Info($"Tone detected at {DateTime.UtcNow}");
                         recorders.Add(new DispatchMessageRecorder(bufferedWaveProvider.WaveFormat));
                         toneDetector.Reset();
                     }
@@ -69,7 +77,7 @@ namespace Mp3Reader
                 recorders.ForEach(r => r.Dispose());
 
 
-                Console.WriteLine("Complete");
+                Log.Info("End of stream");
             }
         }
 
