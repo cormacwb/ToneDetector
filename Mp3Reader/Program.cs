@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using NAudio.Wave;
@@ -11,9 +12,9 @@ namespace Mp3Reader
         private const int SampleBufferSize = 1024;
         private const int TargetFrequency1 = 947;
         private const int TargetFrequency2 = 1270;
-        const string DefaultUrl = "http://provoice.scanbc.com:8000/ecommvancouver";
+        private const string DefaultUrl = "http://provoice.scanbc.com:8000/ecommvancouver";
 
-        static void Main(string[] args)
+        public static void Main(string[] args)
         {
             var url = args.Any() ? args[0] : DefaultUrl;
             var request = (HttpWebRequest)WebRequest.Create(url);
@@ -32,25 +33,18 @@ namespace Mp3Reader
 
             using (var responseStream = response.GetResponseStream())
             {
-                IMp3FrameDecompressor decompressor = null;
-                BufferedWaveProvider bufferedWaveProvider = null;
-                TonePatternDetector toneDetector = null;
                 var sampleBuffer = new float[SampleBufferSize];
                 var recorders = new List<DispatchMessageRecorder>();
                 var byteBuffer = new byte[16384 * 4];
                 var readFullyStream = new ReadFullyStream(responseStream);
+                var decompressor = CreateDecompressor(readFullyStream);
+                var bufferedWaveProvider = CreateBufferedWaveProvider(decompressor);
+                var toneDetector = new TonePatternDetector(TargetFrequency1, TargetFrequency2,
+                    bufferedWaveProvider.WaveFormat.SampleRate);
 
                 while (true)
                 {
                     var frame = Mp3Frame.LoadFromStream(readFullyStream);
-                    if (decompressor == null)
-                    {
-                        decompressor = CreateFrameDecompressor(frame);
-                        bufferedWaveProvider = CreateBufferedWaveProvider(decompressor);
-                        toneDetector = new TonePatternDetector(TargetFrequency1, TargetFrequency2,
-                            bufferedWaveProvider.WaveFormat.SampleRate);
-                    }
-
                     var decompressed = decompressor.DecompressFrame(frame, byteBuffer, 0);
                     bufferedWaveProvider.AddSamples(byteBuffer, 0, decompressed);
                     var bytesRead = bufferedWaveProvider.ToSampleProvider().Read(sampleBuffer, 0, sampleBuffer.Length);
@@ -77,6 +71,13 @@ namespace Mp3Reader
 
                 Console.WriteLine("Complete");
             }
+        }
+
+        private static IMp3FrameDecompressor CreateDecompressor(Stream readFullyStream)
+        {
+            var firstFrame = Mp3Frame.LoadFromStream(readFullyStream);
+            var decompressor = CreateFrameDecompressor(firstFrame);
+            return decompressor;
         }
 
         private static BufferedWaveProvider CreateBufferedWaveProvider(IMp3FrameDecompressor decompressor)
