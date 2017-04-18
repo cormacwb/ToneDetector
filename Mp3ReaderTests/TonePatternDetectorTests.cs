@@ -51,6 +51,7 @@ namespace Mp3ReaderTests
 
         [TestCase("Mp3ReaderTests.TestMp3Files.StaticOnly.mp3")]
         [TestCase("Mp3ReaderTests.TestMp3Files.SpeechWithoutTonePattern.mp3")]
+        [TestCase("Mp3ReaderTests.TestMp3Files.WithFrequenciesInSequenceButNotTargetPattern.mp3")]
         public void Detected_DataDoesNotContainTargetPattern_AlwaysReturnsFalse(string uri)
         {
             var stream = EmbeddedResourceReader.GetStream(uri);

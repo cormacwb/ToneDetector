@@ -12,6 +12,7 @@ namespace Mp3Reader
         private readonly int _targetFrequency1;
         private readonly int _targetFrequency2;
         private readonly int _sampleRate;
+        private DateTime _lastTargetFrequencyHitTimeUtc;
 
         private PatternState _state;
         private int _previousDominantFrequency;
@@ -89,13 +90,21 @@ namespace Mp3Reader
             {
                 Log.Debug($"Detected target frequency {currentDominantFrequency}");
                 _state = StateTransitionMap[_state];
+                _lastTargetFrequencyHitTimeUtc = DateTime.UtcNow;
             }
-            else
+            else if (TooMuchTimeHasElapsed())
             {
                 _state = PatternState.NoTargetFrequencyDetected;
             }
 
             _previousDominantFrequency = currentDominantFrequency;
+        }
+
+        //todo - this is not an ideal method
+        //Would be good to calculate the elapsed time using sample rate instead
+        private bool TooMuchTimeHasElapsed()
+        {
+            return DateTime.UtcNow - TimeSpan.FromMilliseconds(4) > _lastTargetFrequencyHitTimeUtc;
         }
 
         private static readonly Dictionary<PatternState, PatternState> StateTransitionMap = new Dictionary<PatternState, PatternState>
@@ -134,7 +143,6 @@ namespace Mp3Reader
         {
             return Math.Sqrt((complex.X * complex.X) + (complex.Y * complex.Y));
         }
-
 
         private static int GetFrequency(int indexOfMaxMagnitude, int sampleRate, int bufferSize)
         {
