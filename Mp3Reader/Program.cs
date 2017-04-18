@@ -13,7 +13,7 @@ namespace Mp3Reader
     public class Program
     {
         private const int SampleBufferSize = 1024;
-        private const int TargetFrequency1 = 947;
+        private const int TargetFrequency1 = 968;
         private const int TargetFrequency2 = 1270;
         private const string DefaultUrl = "http://provoice.scanbc.com:8000/ecommvancouver";
 
@@ -49,15 +49,16 @@ namespace Mp3Reader
                 var bufferedWaveProvider = CreateBufferedWaveProvider(decompressor);
                 var toneDetector = new TonePatternDetector(TargetFrequency1, TargetFrequency2,
                     bufferedWaveProvider.WaveFormat.SampleRate);
+                var sampleProvider = bufferedWaveProvider.ToSampleProvider();
 
                 while (true)
                 {
                     var frame = Mp3Frame.LoadFromStream(readFullyStream);
-                    var decompressed = decompressor.DecompressFrame(frame, byteBuffer, 0);
-                    bufferedWaveProvider.AddSamples(byteBuffer, 0, decompressed);
-                    var bytesRead = bufferedWaveProvider.ToSampleProvider().Read(sampleBuffer, 0, sampleBuffer.Length);
+                    var bytesReadCount = decompressor.DecompressFrame(frame, byteBuffer, 0);
+                    bufferedWaveProvider.AddSamples(byteBuffer, 0, bytesReadCount);
+                    var sampleCount = sampleProvider.Read(sampleBuffer, 0, sampleBuffer.Length);
 
-                    if (EndOfSamples(bytesRead, sampleBuffer)) break;
+                    if (EndOfSamples(sampleCount, sampleBuffer)) break;
                     
                     if (toneDetector.Detected(sampleBuffer))
                     {
@@ -109,7 +110,6 @@ namespace Mp3Reader
             {
                 if (recorder.IsFinishedRecording)
                 {
-                    Console.WriteLine($"Recording complete at {DateTime.Now}");
                     recorder.Dispose();
                 }
                 else

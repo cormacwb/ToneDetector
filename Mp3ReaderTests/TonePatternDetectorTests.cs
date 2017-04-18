@@ -1,4 +1,5 @@
-﻿using FluentAssertions;
+﻿using System.Collections.Generic;
+using FluentAssertions;
 using Mp3Reader;
 using Mp3ReaderTests.Helpers;
 using NAudio.Wave;
@@ -10,25 +11,33 @@ namespace Mp3ReaderTests
     public class TonePatternDetectorTests
     {
         private const int BufferSize = 1024;
-        private const int TargetFrequency1 = 947;
-        private const int TargetFrequency2 = 1270;
 
-        [TestCase("Mp3ReaderTests.TestMp3Files.WithTonePattern.mp3", 2)]
-        [TestCase("Mp3ReaderTests.TestMp3Files.WithTonePattern2.mp3", 30)]
-        public void Detected_DataContainsTonePattern_EventuallyReturnsTrue(string uri, int expectedTimestampInSeconds)
+        [TestCaseSource(nameof(GetPositiveTestCases))]
+        public void Detected_DataContainsTonePattern_EventuallyReturnsTrue(string uri, int expectedTimestampInSeconds,
+            int frequency1, int frequency2)
         {
             var stream = EmbeddedResourceReader.GetStream(uri);
 
             using (var reader = new Mp3FileReader(stream))
             {
-                SecondsUntilPatternConcluded(reader).Should().Be(expectedTimestampInSeconds);
+                SecondsUntilPatternConcluded(reader, frequency1, frequency2).Should().Be(expectedTimestampInSeconds);
             }
         }
 
-        private static int SecondsUntilPatternConcluded(IWaveProvider reader)
+        private static IEnumerable<TestCaseData> GetPositiveTestCases()
+        {
+            return new List<TestCaseData>
+            {
+                new TestCaseData("Mp3ReaderTests.TestMp3Files.WithTonePattern.mp3", 2, 947, 1270),
+                new TestCaseData("Mp3ReaderTests.TestMp3Files.WithTonePattern2.mp3", 30, 947, 1270),
+                new TestCaseData("Mp3ReaderTests.TestMp3Files.With968-1270Pattern.mp3", 38, 968, 1270)
+            };
+        }
+
+        private static int SecondsUntilPatternConcluded(IWaveProvider reader, int targetFrequency1, int targetFrequency2)
         {
             var sampleProvider = reader.ToSampleProvider();
-            var toneDetector = new TonePatternDetector(TargetFrequency1, TargetFrequency2,
+            var toneDetector = new TonePatternDetector(targetFrequency1, targetFrequency2,
                 sampleProvider.WaveFormat.SampleRate);
             var buffer = new float[BufferSize];
             long sampleCount = 0;
@@ -49,17 +58,26 @@ namespace Mp3ReaderTests
             return -1;
         }
 
-        [TestCase("Mp3ReaderTests.TestMp3Files.StaticOnly.mp3")]
-        [TestCase("Mp3ReaderTests.TestMp3Files.SpeechWithoutTonePattern.mp3")]
-        [TestCase("Mp3ReaderTests.TestMp3Files.WithFrequenciesInSequenceButNotTargetPattern.mp3")]
-        public void Detected_DataDoesNotContainTargetPattern_AlwaysReturnsFalse(string uri)
+        [TestCaseSource(nameof(GetNegativeTestCases))]
+        public void Detected_DataDoesNotContainTargetPattern_AlwaysReturnsFalse(string uri, int frequency1,
+            int frequency2)
         {
             var stream = EmbeddedResourceReader.GetStream(uri);
 
             using (var reader = new Mp3FileReader(stream))
             {
-                SecondsUntilPatternConcluded(reader).Should().Be(-1);
+                SecondsUntilPatternConcluded(reader, frequency1, frequency2).Should().Be(-1);
             }
+        }
+
+        private static IEnumerable<TestCaseData> GetNegativeTestCases()
+        {
+            return new List<TestCaseData>
+            {
+                new TestCaseData("Mp3ReaderTests.TestMp3Files.StaticOnly.mp3", 947, 1270),
+                new TestCaseData("Mp3ReaderTests.TestMp3Files.SpeechWithoutTonePattern.mp3", 947, 1270),
+                new TestCaseData("Mp3ReaderTests.TestMp3Files.WithFrequenciesInSequenceButNotTargetPattern.mp3", 947, 1270)
+            };
         }
     }
 }
