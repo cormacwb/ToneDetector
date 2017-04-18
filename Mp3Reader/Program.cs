@@ -68,7 +68,7 @@ namespace Mp3Reader
 
                     foreach (var recorder in recorders)
                     {
-                        recorder.Record(sampleBuffer, bytesRead);
+                        recorder.Record(byteBuffer, bytesReadCount, sampleBuffer, sampleCount);
                     }
 
                     recorders = RefreshRecorderList(recorders).ToList();

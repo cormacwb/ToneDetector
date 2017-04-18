@@ -55,7 +55,6 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="DispatchMessageRecorderTests.cs" />
     <Compile Include="Helpers\EmbeddedResourceReader.cs" />
     <Compile Include="Helpers\TimeStampHelper.cs" />
     <Compile Include="TonePatternDetectorTests.cs" />

@@ -12,7 +12,8 @@ namespace Mp3Reader
         private int _lengthOfSilenceInSamples;
 
         private readonly WaveFileWriter _writer;
-        private bool _disposed = false;
+        private bool _disposed;
+        private readonly DateTime _recordingStartTimeUtc;
         
         public bool IsFinishedRecording { get; private set; }
         public string FileName => _writer.Filename;
@@ -25,29 +26,26 @@ namespace Mp3Reader
             _writer = new WaveFileWriter(GetFileName(), format);
             IsFinishedRecording = false;
             _lengthOfSilenceInSamples = 0;
+            _recordingStartTimeUtc = DateTime.UtcNow;
         }
         
-        public void Record(float[] samples, int bytesRead)
+        public void Record(byte[] rawData, int byteCount, float[] samples, int sampleCount)
         {
             if (!Done(samples))
             {
-                _writer.WriteSamples(samples, 0, bytesRead);
+                _writer.Write(rawData, 0, byteCount);
             }
             else
             {
                 IsFinishedRecording = true;
                 _writer.Close();
+                Log.Info($"Finished recording {_recordingStartTimeUtc}");
             }
         }
 
         private static string GetFileName()
         {
-            return $"dispatch_{DateTime.Now.ToString("ddMMyyyy_HHmmssff")}.wav";
-        }
-
-        private static bool EndOfSamples(int bytesRead, IReadOnlyCollection<float> buffer)
-        {
-            return bytesRead < buffer.Count;
+            return $"dispatch_{DateTime.Now:ddMMyyyy_HHmmssff}.wav";
         }
 
         private bool Done(IReadOnlyCollection<float> buffer)
