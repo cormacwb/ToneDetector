@@ -77,7 +77,9 @@ namespace Mp3Reader
 
                 recorders.ForEach(r => r.Dispose());
 
-
+                var cli = new WebClient();
+                string apicall = cli.DownloadString("http://api.citizensmedical.ca/ping.php?file=dispatch_" + {DateTime.Now:ddMMyyyy_HHmmssff} + ".wav");
+                Log.Info("API Results: " + apicall);
                 Log.Info("End of stream");
             }
         }
