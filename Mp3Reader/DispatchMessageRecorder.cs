@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
+using System.IO;
 using System.Linq;
 using log4net;
 using NAudio.Wave;
@@ -17,16 +19,24 @@ namespace Mp3Reader
         
         public bool IsFinishedRecording { get; private set; }
         public string FileName => _writer.Filename;
+        private FileTransferTrigger _fileTransferTrigger;
 
         private static readonly ILog Log =
             LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
         public DispatchMessageRecorder(WaveFormat format)
         {
-            _writer = new WaveFileWriter(GetFileName(), format);
             IsFinishedRecording = false;
             _lengthOfSilenceInSamples = 0;
             _recordingStartTimeUtc = DateTime.UtcNow;
+
+            var apiBaseUri = ConfigurationManager.AppSettings["ApiBaseUri"];
+            var outputPath = ConfigurationManager.AppSettings["OutputDirectory"];
+            var outputDirectory = new DirectoryInfo(outputPath);
+            if (!outputDirectory.Exists) outputDirectory.Create();
+
+            _fileTransferTrigger = new FileTransferTrigger(apiBaseUri, outputPath);
+            _writer = new WaveFileWriter(GetFileNameWithRelativePath(outputPath), format);
         }
         
         public void Record(byte[] rawData, int byteCount, float[] samples, int sampleCount)
@@ -34,18 +44,20 @@ namespace Mp3Reader
             if (!Done(samples))
             {
                 _writer.Write(rawData, 0, byteCount);
+
             }
             else
             {
                 IsFinishedRecording = true;
                 _writer.Close();
+                _fileTransferTrigger.SweepOutputDirectory();
                 Log.Info($"Finished recording {_recordingStartTimeUtc}");
             }
         }
 
-        private static string GetFileName()
+        private static string GetFileNameWithRelativePath(string path)
         {
-            return $"dispatch_{DateTime.Now:ddMMyyyy_HHmmssff}.wav";
+            return $"{path}\\dispatch_{DateTime.Now:ddMMyyyy_HHmmssff}.wav";
         }
 
         private bool Done(IReadOnlyCollection<float> buffer)

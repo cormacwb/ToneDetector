@@ -46,6 +46,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DispatchMessageRecorder.cs" />
+    <Compile Include="FileTransferTrigger.cs" />
     <Compile Include="Interface\ITonePatternDetector.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
