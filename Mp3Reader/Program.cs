@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -13,19 +14,19 @@ namespace Mp3Reader
     public class Program
     {
         private const int SampleBufferSize = 1024;
-        private const int TargetFrequency1 = 968;
-        private const int TargetFrequency2 = 1270;
-        private const string DefaultUrl = "http://provoice.scanbc.com:8000/ecommvancouver";
+        private static string _streamUrl;
+        private static int _toneFrequency1;
+        private static int _toneFrequency2;
 
         private static readonly ILog Log =
             LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
         public static void Main(string[] args)
         {
+            ReadApplicationSettings();
             XmlConfigurator.Configure();
             Log.Info("Starting...");
-            var url = args.Any() ? args[0] : DefaultUrl;
-            var request = (HttpWebRequest)WebRequest.Create(url);
+            var request = (HttpWebRequest)WebRequest.Create(_streamUrl);
 
             HttpWebResponse response = null;
             try
@@ -47,7 +48,7 @@ namespace Mp3Reader
                 var readFullyStream = new ReadFullyStream(responseStream);
                 var decompressor = CreateDecompressor(readFullyStream);
                 var bufferedWaveProvider = CreateBufferedWaveProvider(decompressor);
-                var toneDetector = new TonePatternDetector(TargetFrequency1, TargetFrequency2,
+                var toneDetector = new TonePatternDetector(_toneFrequency1, _toneFrequency2,
                     bufferedWaveProvider.WaveFormat.SampleRate);
                 var sampleProvider = bufferedWaveProvider.ToSampleProvider();
 
@@ -77,9 +78,15 @@ namespace Mp3Reader
 
                 recorders.ForEach(r => r.Dispose());
 
-
                 Log.Info("End of stream");
             }
+        }
+
+        private static void ReadApplicationSettings()
+        {
+            _streamUrl = ConfigurationManager.AppSettings["StreamUrl"];
+            _toneFrequency1 = Convert.ToInt32(ConfigurationManager.AppSettings["Tone1Frequency"]);
+            _toneFrequency2 = Convert.ToInt32(ConfigurationManager.AppSettings["Tone2Frequency"]);
         }
 
         private static IMp3FrameDecompressor CreateDecompressor(Stream readFullyStream)
