@@ -51,6 +51,7 @@
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ReadFullyStream.cs" />
+    <Compile Include="SilenceDetector.cs" />
     <Compile Include="TonePatternDetector.cs" />
     <Compile Include="PatternState.cs" />
   </ItemGroup>

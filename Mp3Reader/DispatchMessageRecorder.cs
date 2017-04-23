@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Configuration;
 using System.IO;
-using System.Linq;
 using log4net;
 using NAudio.Wave;
 
@@ -10,16 +8,14 @@ namespace Mp3Reader
 {
     public class DispatchMessageRecorder : IDisposable
     {
-        private const double SilenceThreshold = 0.01;
-        private int _lengthOfSilenceInSamples;
-
         private readonly WaveFileWriter _writer;
+        private readonly SilenceDetector _silenceDetector;
         private bool _disposed;
         private readonly DateTime _recordingStartTimeUtc;
         
         public bool IsFinishedRecording { get; private set; }
         public string FileName => _writer.Filename;
-        private FileTransferTrigger _fileTransferTrigger;
+        private readonly FileTransferTrigger _fileTransferTrigger;
 
         private static readonly ILog Log =
             LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
@@ -27,7 +23,6 @@ namespace Mp3Reader
         public DispatchMessageRecorder(WaveFormat format)
         {
             IsFinishedRecording = false;
-            _lengthOfSilenceInSamples = 0;
             _recordingStartTimeUtc = DateTime.UtcNow;
 
             var apiBaseUri = ConfigurationManager.AppSettings["ApiBaseUri"];
@@ -37,11 +32,12 @@ namespace Mp3Reader
 
             _fileTransferTrigger = new FileTransferTrigger(apiBaseUri, outputPath);
             _writer = new WaveFileWriter(GetFileNameWithRelativePath(outputPath), format);
+            _silenceDetector = new SilenceDetector(format.SampleRate);
         }
         
         public void Record(byte[] rawData, int byteCount, float[] samples, int sampleCount)
         {
-            if (!Done(samples))
+            if (!_silenceDetector.IsRecordingComplete(samples))
             {
                 _writer.Write(rawData, 0, byteCount);
 
@@ -60,20 +56,6 @@ namespace Mp3Reader
             return $"{path}\\dispatch_{DateTime.Now:ddMMyyyy_HHmmssff}.wav";
         }
 
-        private bool Done(IReadOnlyCollection<float> buffer)
-        {
-            var containsOnlySilence = buffer.All(n => Math.Abs(n) < SilenceThreshold);
-
-            if (containsOnlySilence)
-            {
-                _lengthOfSilenceInSamples += buffer.Count;
-                var secondsOfSilence = _lengthOfSilenceInSamples/_writer.WaveFormat.SampleRate;
-                return secondsOfSilence > 2;
-            }
-
-            _lengthOfSilenceInSamples = 0;
-            return false;
-        }
 
         private void Dispose(bool disposing)
         {
