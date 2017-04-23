@@ -45,8 +45,10 @@
     <Reference Include="System.Net.Http" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ConfigurationReader.cs" />
     <Compile Include="DispatchMessageRecorder.cs" />
     <Compile Include="FileTransferTrigger.cs" />
+    <Compile Include="Interface\IConfigurationReader.cs" />
     <Compile Include="Interface\IDispatchMessageRecorder.cs" />
     <Compile Include="Interface\ITonePatternDetector.cs" />
     <Compile Include="Interface\ISilenceDetector.cs" />
