@@ -2,11 +2,12 @@
 using System.Configuration;
 using System.IO;
 using log4net;
+using Mp3Reader.Interface;
 using NAudio.Wave;
 
 namespace Mp3Reader
 {
-    public class DispatchMessageRecorder : IDisposable
+    public class DispatchMessageRecorder : IDisposable, IDispatchMessageRecorder
     {
         private readonly WaveFileWriter _writer;
         private readonly SilenceDetector _silenceDetector;

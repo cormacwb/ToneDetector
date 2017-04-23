@@ -47,7 +47,9 @@
   <ItemGroup>
     <Compile Include="DispatchMessageRecorder.cs" />
     <Compile Include="FileTransferTrigger.cs" />
+    <Compile Include="Interface\IDispatchMessageRecorder.cs" />
     <Compile Include="Interface\ITonePatternDetector.cs" />
+    <Compile Include="Interface\ISilenceDetector.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ReadFullyStream.cs" />

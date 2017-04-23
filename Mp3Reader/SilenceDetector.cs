@@ -2,10 +2,11 @@
 using System.Collections.Generic;
 using System.Configuration;
 using System.Linq;
+using Mp3Reader.Interface;
 
 namespace Mp3Reader
 {
-    public class SilenceDetector
+    public class SilenceDetector : ISilenceDetector
     {
         private const double SilenceThreshold = 0.01;
         private readonly int _sampleRate;
