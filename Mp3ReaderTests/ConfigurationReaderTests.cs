@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using FluentAssertions;
+﻿using FluentAssertions;
 using Mp3Reader;
 using Mp3Reader.Interface;
 using NUnit.Framework;
@@ -19,40 +17,27 @@ namespace Mp3ReaderTests
         }
 
         [Test]
-        public void ReadStringSetting_SettingExists_ReturnsValue()
+        public void ReadToneFrequency1_ReturnsValue()
         {
-            var result = _configurationReader.ReadStringSetting("TestStringSetting");
+            var result = _configurationReader.ReadToneFrequency1();
 
-            result.Should().Be("TestValue");
+            result.Should().Be(1);
         }
 
         [Test]
-        public void ReadStringSetting_SettingDoesNotExist_Throws()
+        public void ReadToneFrequency2_ReturnsValue()
         {
-            Assert.That(() => _configurationReader.ReadStringSetting("DoesNotExist"),
-                Throws.Exception.TypeOf<KeyNotFoundException>());
+            var result = _configurationReader.ReadToneFrequency2();
+
+            result.Should().Be(2);
         }
 
         [Test]
-        public void ReadIntSetting_ValidSettingExists_ReturnsValue()
+        public void ReadStreamUrl_ReturnsValue()
         {
-            var result = _configurationReader.ReadIntSetting("TestIntSetting");
+            var result = _configurationReader.ReadStreamUrl();
 
-            result.Should().Be(5);
-        }
-
-        [Test]
-        public void ReadIntSetting_SettingDoesNotExist_Throws()
-        {
-            Assert.That(() => _configurationReader.ReadIntSetting("DoesNotExist"),
-                Throws.Exception.TypeOf<KeyNotFoundException>());
-        }
-
-        [Test]
-        public void ReadIntSetting_ValueIsNotInt_Throws()
-        {
-            Assert.That(() => _configurationReader.ReadIntSetting("TestStringSetting"),
-                Throws.Exception.TypeOf<FormatException>());
+            result.Should().Be("www.fakeurl.com");
         }
     }
 }

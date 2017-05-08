@@ -11,7 +11,6 @@ namespace Mp3Reader
     {
         private readonly int _targetFrequency1;
         private readonly int _targetFrequency2;
-        private readonly int _sampleRate;
         private DateTime _lastTargetFrequencyHitTimeUtc;
 
         private PatternState _state;
@@ -19,11 +18,10 @@ namespace Mp3Reader
         private static readonly ILog Log =
             LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
-        public TonePatternDetector(int targetFrequency1, int targetFrequency2, int sampleRate)
+        public TonePatternDetector(IConfigurationReader configurationReader)
         {
-            _targetFrequency1 = targetFrequency1;
-            _targetFrequency2 = targetFrequency2;
-            _sampleRate = sampleRate;
+            _targetFrequency1 = configurationReader.ReadToneFrequency1();
+            _targetFrequency2 = configurationReader.ReadToneFrequency2();
             _state = PatternState.NoTargetFrequencyDetected;
         }
 
@@ -32,14 +30,14 @@ namespace Mp3Reader
             _state = PatternState.NoTargetFrequencyDetected;
         }
 
-        public bool Detected(float[] samples)
+        public bool Detected(float[] samples, int sampleRate)
         {
             if (_state == PatternState.ToneDetected) return true;
             Validate(samples);
 
             var fft = CreateFftBuffer(samples);
             FastFourierTransform.FFT(true, GetLog(samples.Length), fft);
-            UpdateState(fft);
+            UpdateState(fft, sampleRate);
 
             return _state == PatternState.ToneDetected;
         }
@@ -79,9 +77,9 @@ namespace Mp3Reader
             return (int)Math.Log(bufferSize, 2);
         }
 
-        private void UpdateState(Complex[] fft)
+        private void UpdateState(Complex[] fft, int sampleRate)
         {
-            var currentDominantFrequency = GetDominantFrequency(fft);
+            var currentDominantFrequency = GetDominantFrequency(fft, sampleRate);
 
             if (_previousDominantFrequency == currentDominantFrequency) return;
 
@@ -117,10 +115,10 @@ namespace Mp3Reader
             {PatternState.Repetion3Frequency1, PatternState.ToneDetected}
         };
 
-        private int GetDominantFrequency(Complex[] fft)
+        private int GetDominantFrequency(Complex[] fft, int sampleRate)
         {
             var indexOfMaxMagnitude = GetIndexOfMaxMagnitude(fft);
-            return GetFrequency(indexOfMaxMagnitude, _sampleRate, fft.Length);
+            return GetFrequency(indexOfMaxMagnitude, sampleRate, fft.Length);
         }
 
         private static int GetIndexOfMaxMagnitude(Complex[] fft)

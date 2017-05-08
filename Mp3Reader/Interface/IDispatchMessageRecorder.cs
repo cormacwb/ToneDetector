@@ -1,10 +1,11 @@
+using System;
+
 namespace Mp3Reader.Interface
 {
-    public interface IDispatchMessageRecorder
+    public interface IDispatchMessageRecorder : IDisposable
     {
-        bool IsFinishedRecording { get; }
         string FileName { get; }
         void Record(byte[] rawData, int byteCount, float[] samples, int sampleCount);
-        void Dispose();
+        void Close();
     }
 }

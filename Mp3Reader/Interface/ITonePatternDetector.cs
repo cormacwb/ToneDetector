@@ -2,6 +2,7 @@
 {
     public interface ITonePatternDetector
     {
-        bool Detected(float [] samples);
+        bool Detected(float [] samples, int sampleRate);
+        void Reset();
     }
 }

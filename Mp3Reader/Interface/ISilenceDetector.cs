@@ -4,6 +4,6 @@ namespace Mp3Reader.Interface
 {
     public interface ISilenceDetector
     {
-        bool IsRecordingComplete(IReadOnlyCollection<float> buffer);
+        bool IsRecordingComplete(IReadOnlyCollection<float> buffer, int sampleRate);
     }
 }

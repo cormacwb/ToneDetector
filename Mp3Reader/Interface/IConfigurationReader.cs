@@ -2,7 +2,8 @@
 {
     public interface IConfigurationReader
     {
-        string ReadStringSetting(string key);
-        int ReadIntSetting(string key);
+        int ReadToneFrequency1();
+        int ReadToneFrequency2();
+        string ReadStreamUrl();
     }
 }

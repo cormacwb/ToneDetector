@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using FluentAssertions;
+using Moq;
 using Mp3Reader;
+using Mp3Reader.Interface;
 using Mp3ReaderTests.Helpers;
 using NAudio.Wave;
 using NUnit.Framework;
@@ -11,16 +13,26 @@ namespace Mp3ReaderTests
     public class TonePatternDetectorTests
     {
         private const int BufferSize = 1024;
+        private IConfigurationReader _mockConfigurationReader;
+
+        private void SetUpMockConfigurationReader(int frequency1, int frequency2)
+        {
+            var mock = new Mock<IConfigurationReader>();
+            mock.Setup(r => r.ReadToneFrequency1()).Returns(frequency1);
+            mock.Setup(r => r.ReadToneFrequency2()).Returns(frequency2);
+            _mockConfigurationReader = mock.Object;
+        }
 
         [TestCaseSource(nameof(GetPositiveTestCases))]
         public void Detected_DataContainsTonePattern_EventuallyReturnsTrue(string uri, int expectedTimestampInSeconds,
             int frequency1, int frequency2)
         {
+            SetUpMockConfigurationReader(frequency1, frequency2);
             var stream = EmbeddedResourceReader.GetStream(uri);
 
             using (var reader = new Mp3FileReader(stream))
             {
-                SecondsUntilPatternConcluded(reader, frequency1, frequency2).Should().Be(expectedTimestampInSeconds);
+                SecondsUntilPatternConcluded(reader).Should().Be(expectedTimestampInSeconds);
             }
         }
 
@@ -34,11 +46,10 @@ namespace Mp3ReaderTests
             };
         }
 
-        private static int SecondsUntilPatternConcluded(IWaveProvider reader, int targetFrequency1, int targetFrequency2)
+        private int SecondsUntilPatternConcluded(IWaveProvider reader)
         {
             var sampleProvider = reader.ToSampleProvider();
-            var toneDetector = new TonePatternDetector(targetFrequency1, targetFrequency2,
-                sampleProvider.WaveFormat.SampleRate);
+            var toneDetector = new TonePatternDetector(_mockConfigurationReader);
             var buffer = new float[BufferSize];
             long sampleCount = 0;
 
@@ -49,7 +60,7 @@ namespace Mp3ReaderTests
 
                 if (bytesRead < buffer.Length) break;
 
-                if (toneDetector.Detected(buffer))
+                if (toneDetector.Detected(buffer, sampleProvider.WaveFormat.SampleRate))
                 {
                     return TimeStampHelper.GetElapsedSeconds(sampleProvider.WaveFormat.SampleRate, sampleCount);
                 }
@@ -62,11 +73,12 @@ namespace Mp3ReaderTests
         public void Detected_DataDoesNotContainTargetPattern_AlwaysReturnsFalse(string uri, int frequency1,
             int frequency2)
         {
+            SetUpMockConfigurationReader(frequency1, frequency2);
             var stream = EmbeddedResourceReader.GetStream(uri);
 
             using (var reader = new Mp3FileReader(stream))
             {
-                SecondsUntilPatternConcluded(reader, frequency1, frequency2).Should().Be(-1);
+                SecondsUntilPatternConcluded(reader).Should().Be(-1);
             }
         }
 
