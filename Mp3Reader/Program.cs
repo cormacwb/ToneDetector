@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Threading;
 using DryIoc;
 using NAudio.Wave;
 using log4net;
@@ -17,24 +18,15 @@ namespace Mp3Reader
         private static readonly ILog Log =
             LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 
+        private static IContainer _container;
+
         public static void Main(string[] args)
         {
-            var container = CreateContainer();
+            _container = CreateContainer();
             XmlConfigurator.Configure();
             Log.Info("Starting...");
-            var request = (HttpWebRequest) WebRequest.Create(container.Resolve<IConfigurationReader>().ReadStreamUrl());
-
-            HttpWebResponse response = null;
-            try
-            {
-                response = (HttpWebResponse)request.GetResponse();
-                Log.Info("Connected");
-            }
-            catch (WebException e)
-            {
-                Log.Error($"Could not read stream: {e.Message}");
-                Environment.Exit(1);
-            }
+            var request = (HttpWebRequest) WebRequest.Create(_container.Resolve<IConfigurationReader>().ReadStreamUrl());
+            var response = GetHttpWebResponse(request);
 
             using (var responseStream = response.GetResponseStream())
             {
@@ -44,14 +36,14 @@ namespace Mp3Reader
                 var readFullyStream = new ReadFullyStream(responseStream);
                 var decompressor = CreateDecompressor(readFullyStream);
                 var bufferedWaveProvider = CreateBufferedWaveProvider(decompressor);
-                var toneDetector = container.Resolve<ITonePatternDetector>();
+                var toneDetector = _container.Resolve<ITonePatternDetector>();
                 var sampleProvider = bufferedWaveProvider.ToSampleProvider();
                 var sampleRate = bufferedWaveProvider.WaveFormat.SampleRate;
-                var silenceDetector = container.Resolve<ISilenceDetector>();
+                var silenceDetector = _container.Resolve<ISilenceDetector>();
 
                 while (true)
                 {
-                    var frame = Mp3Frame.LoadFromStream(readFullyStream);
+                    var frame = ReadFrame(readFullyStream);
                     var bytesReadCount = decompressor.DecompressFrame(frame, byteBuffer, 0);
                     bufferedWaveProvider.AddSamples(byteBuffer, 0, bytesReadCount);
                     var sampleCount = sampleProvider.Read(sampleBuffer, 0, sampleBuffer.Length);
@@ -85,7 +77,8 @@ namespace Mp3Reader
 
         private static IContainer CreateContainer()
         {
-            var container = new Container();
+            var container = new Container(rules => rules.WithoutThrowOnRegisteringDisposableTransient());
+            container.Register<IConfigurationReader, ConfigurationReader>();
             container.Register<IDispatchMessageRecorder, DispatchMessageRecorder>(Reuse.Transient);
             container.Register<ITonePatternDetector, TonePatternDetector>(Reuse.Singleton);
             container.Register<ISilenceDetector, SilenceDetector>();
@@ -93,11 +86,33 @@ namespace Mp3Reader
             return container;
         }
 
-        private static IMp3FrameDecompressor CreateDecompressor(Stream readFullyStream)
+        private static HttpWebResponse GetHttpWebResponse(WebRequest request)
         {
-            var firstFrame = Mp3Frame.LoadFromStream(readFullyStream);
-            var decompressor = CreateFrameDecompressor(firstFrame);
-            return decompressor;
+            HttpWebResponse response = null;
+            try
+            {
+                response = (HttpWebResponse) request.GetResponse();
+                Log.Info("Connected");
+            }
+            catch (Exception e)
+            {
+                Log.Error($"Could not read stream: {e.Message}");
+                Environment.Exit(1);
+            }
+            return response;
+        }
+
+        private static IMp3FrameDecompressor CreateDecompressor(Stream frame)
+        {
+            var firstFrame = ReadFrame(frame);
+            return CreateFrameDecompressor(firstFrame);
+        }
+
+        private static IMp3FrameDecompressor CreateFrameDecompressor(Mp3Frame frame)
+        {
+            var waveFormat = new Mp3WaveFormat(frame.SampleRate, frame.ChannelMode == ChannelMode.Mono ? 1 : 2,
+                frame.FrameLength, frame.BitRate);
+            return new AcmMp3FrameDecompressor(waveFormat);
         }
 
         private static BufferedWaveProvider CreateBufferedWaveProvider(IMp3FrameDecompressor decompressor)
@@ -108,11 +123,21 @@ namespace Mp3Reader
             };
         }
 
-        private static IMp3FrameDecompressor CreateFrameDecompressor(Mp3Frame frame)
+        private static Mp3Frame ReadFrame(Stream readFullyStream)
         {
-            var waveFormat = new Mp3WaveFormat(frame.SampleRate, frame.ChannelMode == ChannelMode.Mono ? 1 : 2,
-                frame.FrameLength, frame.BitRate);
-            return new AcmMp3FrameDecompressor(waveFormat);
+            while (true)
+            {
+                try
+                {
+                    return Mp3Frame.LoadFromStream(readFullyStream);
+                }
+                catch (Exception exception)
+                {
+                    Log.Error(exception);
+                    var periodToSleep = _container.Resolve<IConfigurationReader>().ReadSleepTime();
+                    Thread.Sleep(periodToSleep);
+                }
+            }
         }
 
         private static bool EndOfSamples(int bytesRead, IReadOnlyCollection<float> buffer)

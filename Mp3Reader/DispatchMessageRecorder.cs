@@ -7,7 +7,7 @@ using NAudio.Wave;
 
 namespace Mp3Reader
 {
-    public class DispatchMessageRecorder : IDisposable, IDispatchMessageRecorder
+    public class DispatchMessageRecorder : IDispatchMessageRecorder
     {
         private readonly WaveFileWriter _writer;
         private bool _disposed;
@@ -48,7 +48,6 @@ namespace Mp3Reader
         {
             return $"{path}\\dispatch_{DateTime.Now:ddMMyyyy_HHmmssff}.wav";
         }
-
 
         private void Dispose(bool disposing)
         {

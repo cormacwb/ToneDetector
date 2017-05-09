@@ -35,5 +35,12 @@ namespace Mp3Reader
 
             return value;
         }
+
+        public TimeSpan ReadSleepTime()
+        {
+            var numberOfSeconds = ReadIntSetting("SecondsToSleepAfterFailureToReadStream");
+
+            return TimeSpan.FromSeconds(numberOfSeconds);
+        }
     }
 }
