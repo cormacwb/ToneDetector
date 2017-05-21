@@ -64,7 +64,12 @@ namespace Mp3Reader
 
                     if(silenceDetector.IsRecordingComplete(sampleBuffer, sampleRate))
                     {
-                        recorders.ForEach(r => r.Dispose());
+                        recorders.ForEach(r =>
+                        {
+                            r.Close();
+                            r.Dispose();
+                        });
+
                         recorders.Clear();
                     }
                 }
