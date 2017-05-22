@@ -61,7 +61,7 @@
   <ItemGroup>
     <Compile Include="ConfigurationReaderTests.cs" />
     <Compile Include="Helpers\EmbeddedResourceReader.cs" />
-    <Compile Include="Helpers\TimeStampHelper.cs" />
+    <Compile Include="ElapsedTimeSpanHelperTests.cs" />
     <Compile Include="TonePatternDetectorTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

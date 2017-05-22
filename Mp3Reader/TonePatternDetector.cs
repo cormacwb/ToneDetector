@@ -11,7 +11,7 @@ namespace Mp3Reader
     {
         private readonly int _targetFrequency1;
         private readonly int _targetFrequency2;
-        private DateTime _lastTargetFrequencyHitTimeUtc;
+        private long _samplesReadSinceBeginningOfPattern;
 
         private PatternState _state;
         private int _previousDominantFrequency;
@@ -37,7 +37,7 @@ namespace Mp3Reader
 
             var fft = CreateFftBuffer(samples);
             FastFourierTransform.FFT(true, GetLog(samples.Length), fft);
-            UpdateState(fft, sampleRate);
+            UpdateState(fft, sampleRate, samples);
 
             return _state == PatternState.ToneDetected;
         }
@@ -77,7 +77,7 @@ namespace Mp3Reader
             return (int)Math.Log(bufferSize, 2);
         }
 
-        private void UpdateState(Complex[] fft, int sampleRate)
+        private void UpdateState(Complex[] fft, int sampleRate, float[] samples)
         {
             var currentDominantFrequency = GetDominantFrequency(fft, sampleRate);
 
@@ -88,21 +88,21 @@ namespace Mp3Reader
             {
                 Log.Debug($"Detected target frequency {currentDominantFrequency}");
                 _state = StateTransitionMap[_state];
-                _lastTargetFrequencyHitTimeUtc = DateTime.UtcNow;
+                _samplesReadSinceBeginningOfPattern += samples.Length;
             }
-            else if (TooMuchTimeHasElapsed())
+            else if (TooMuchTimeHasElapsed(sampleRate))
             {
                 _state = PatternState.NoTargetFrequencyDetected;
+                _samplesReadSinceBeginningOfPattern = 0;
             }
 
             _previousDominantFrequency = currentDominantFrequency;
         }
 
-        //todo - this is not an ideal method
-        //Would be good to calculate the elapsed time using sample rate instead
-        private bool TooMuchTimeHasElapsed()
+        private bool TooMuchTimeHasElapsed(int sampleRate)
         {
-            return DateTime.UtcNow - TimeSpan.FromMilliseconds(4) > _lastTargetFrequencyHitTimeUtc;
+            return ElapsedTimeSpanHelper.GetElapsedTimeSpan(sampleRate, _samplesReadSinceBeginningOfPattern) >
+                   TimeSpan.FromMilliseconds(4);
         }
 
         private static readonly Dictionary<PatternState, PatternState> StateTransitionMap = new Dictionary<PatternState, PatternState>

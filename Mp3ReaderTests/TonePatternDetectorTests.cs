@@ -24,8 +24,8 @@ namespace Mp3ReaderTests
         }
 
         [TestCaseSource(nameof(GetPositiveTestCases))]
-        public void Detected_DataContainsTonePattern_EventuallyReturnsTrue(string uri, int expectedTimestampInSeconds,
-            int frequency1, int frequency2)
+        public void Detected_DataContainsTonePattern_ReturnsTrueAtExpectedTimestamp(string uri,
+            int expectedTimestampInSeconds, int frequency1, int frequency2)
         {
             SetUpMockConfigurationReader(frequency1, frequency2);
             var stream = EmbeddedResourceReader.GetStream(uri);
@@ -62,7 +62,7 @@ namespace Mp3ReaderTests
 
                 if (toneDetector.Detected(buffer, sampleProvider.WaveFormat.SampleRate))
                 {
-                    return TimeStampHelper.GetElapsedSeconds(sampleProvider.WaveFormat.SampleRate, sampleCount);
+                    return ElapsedTimeSpanHelper.GetElapsedTimeSpan(sampleProvider.WaveFormat.SampleRate, sampleCount).Seconds;
                 }
             }
 
